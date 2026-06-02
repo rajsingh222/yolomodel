@@ -28,6 +28,7 @@ Environment variables:
 ```text
 PYTHON_VERSION=3.12.10
 MODEL_PATH=best.pt
+YOLO_CONFIG_DIR=/tmp/Ultralytics
 ```
 
 After deployment, open:

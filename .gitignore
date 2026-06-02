@@ -5,6 +5,8 @@ server.log
 server.err.log
 render-test.log
 render-test.err.log
+startup-fix.log
+startup-fix.err.log
 .env
 .venv/
 venv/

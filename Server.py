@@ -1,17 +1,19 @@
 from fastapi import BackgroundTasks, FastAPI, UploadFile, File, Query, WebSocket
 from fastapi.responses import FileResponse, JSONResponse
-from ultralytics import YOLO
 import numpy as np
 import cv2
 import tempfile
 import os
 import logging
 
+os.environ.setdefault("YOLO_CONFIG_DIR", "/tmp/Ultralytics")
+
+from ultralytics import YOLO
+
 app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("pothole-api")
 
-# Load model once
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH_VALUE = os.getenv("MODEL_PATH", "best.pt")
 MODEL_PATH = (
@@ -19,8 +21,16 @@ MODEL_PATH = (
     if os.path.isabs(MODEL_PATH_VALUE)
     else os.path.join(BASE_DIR, MODEL_PATH_VALUE)
 )
-logger.info("Loading YOLO model from %s", MODEL_PATH)
-model = YOLO(MODEL_PATH, task="detect")
+model = None
+
+
+def get_model():
+    global model
+    if model is None:
+        logger.info("Loading YOLO model from %s", MODEL_PATH)
+        model = YOLO(MODEL_PATH, task="detect")
+        logger.info("YOLO model loaded")
+    return model
 
 
 def cleanup_file(path: str):
@@ -33,7 +43,9 @@ async def health_check():
     logger.info("Health check requested")
     return {
         "status": "ok",
-        "message": "Pothole detection API is running"
+        "message": "Pothole detection API is running",
+        "model_path": MODEL_PATH,
+        "model_loaded": model is not None
     }
 
 # -----------------------------------
@@ -42,13 +54,14 @@ async def health_check():
 @app.post("/predict_image")
 async def predict_image(file: UploadFile = File(...)):
     logger.info("Image prediction requested: %s", file.filename)
+    yolo_model = get_model()
 
     contents = await file.read()
 
     nparr = np.frombuffer(contents, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-    results = model.track(
+    results = yolo_model.track(
         img,
         conf=0.05,
         persist=True
@@ -74,7 +87,7 @@ async def predict_image(file: UploadFile = File(...)):
 
                 "id": track_id,
 
-                "class": model.names[cls],
+                "class": yolo_model.names[cls],
 
                 "confidence": round(conf,2),
 
@@ -104,6 +117,7 @@ async def predict_video(
     download: bool = Query(False)
 ):
     logger.info("Video prediction requested: %s download=%s", file.filename, download)
+    yolo_model = get_model()
 
     temp_input = tempfile.NamedTemporaryFile(
         delete=False,
@@ -166,7 +180,7 @@ async def predict_video(
             frame_count += 1
             continue
 
-        results = model.track(
+        results = yolo_model.track(
             frame,
             conf=0.05,
             persist=True
@@ -184,7 +198,7 @@ async def predict_video(
                     else -1
                 )
 
-                label = model.names[cls]
+                label = yolo_model.names[cls]
 
                 if label == "pothole":
                     potholes.add(track_id)
@@ -273,6 +287,7 @@ async def predict_video(
 async def websocket_live(websocket: WebSocket):
 
     await websocket.accept()
+    yolo_model = get_model()
 
     logger.info("Live client connected")
 
@@ -296,7 +311,7 @@ async def websocket_live(websocket: WebSocket):
             if frame is None:
                 continue
 
-            results = model.track(
+            results = yolo_model.track(
                 frame,
                 conf=0.05,
                 persist=True
@@ -322,7 +337,7 @@ async def websocket_live(websocket: WebSocket):
 
                         "id": track_id,
 
-                        "class": model.names[cls],
+                        "class": yolo_model.names[cls],
 
                         "confidence": round(conf,2),
 

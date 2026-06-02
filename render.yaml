@@ -9,3 +9,5 @@ services:
         value: 3.12.10
       - key: MODEL_PATH
         value: best.pt
+      - key: YOLO_CONFIG_DIR
+        value: /tmp/Ultralytics
