@@ -184,14 +184,10 @@ async def predict_video(
             frame_count += 1
             continue
 
-        # Resize for faster inference
-        frame_resized = cv2.resize(frame, (320, 320))
-        
         results = yolo_model.track(
-            frame_resized,
+            frame,
             conf=0.05,
-            persist=True,
-            imgsz=320
+            persist=True
         )
 
         for r in results:
@@ -319,14 +315,10 @@ async def websocket_live(websocket: WebSocket):
             if frame is None:
                 continue
 
-            # Resize for faster inference
-            frame_resized = cv2.resize(frame, (320, 320))
-            
             results = yolo_model.track(
-                frame_resized,
+                frame,
                 conf=0.05,
-                persist=True,
-                imgsz=320
+                persist=True
             )
 
             detections = []
