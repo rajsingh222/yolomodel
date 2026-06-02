@@ -60,11 +60,15 @@ async def predict_image(file: UploadFile = File(...)):
 
     nparr = np.frombuffer(contents, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    
+    # Resize for faster inference (reduce from 448x640 to 320x320)
+    img_resized = cv2.resize(img, (320, 320))
 
     results = yolo_model.track(
-        img,
+        img_resized,
         conf=0.05,
-        persist=True
+        persist=True,
+        imgsz=320
     )
 
     detections = []
@@ -180,10 +184,14 @@ async def predict_video(
             frame_count += 1
             continue
 
+        # Resize for faster inference
+        frame_resized = cv2.resize(frame, (320, 320))
+        
         results = yolo_model.track(
-            frame,
+            frame_resized,
             conf=0.05,
-            persist=True
+            persist=True,
+            imgsz=320
         )
 
         for r in results:
@@ -311,10 +319,14 @@ async def websocket_live(websocket: WebSocket):
             if frame is None:
                 continue
 
+            # Resize for faster inference
+            frame_resized = cv2.resize(frame, (320, 320))
+            
             results = yolo_model.track(
-                frame,
+                frame_resized,
                 conf=0.05,
-                persist=True
+                persist=True,
+                imgsz=320
             )
 
             detections = []
